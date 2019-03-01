@@ -20,3 +20,6 @@ pytest = "^4.0"
 [build-system]
 requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"
+
+[tool.poetry.scripts]
+index = "uniwatch.indexer:main"

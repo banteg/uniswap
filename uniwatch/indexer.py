@@ -65,18 +65,15 @@ async def index_parallel(exchanges: [Exchange], step=4096):
             await event.save()
 
 
-async def main():
+async def start():
     await db.init()
     exchanges = await get_exchanges()
     await index_parallel(exchanges)
 
 
-'''
-+1. get exchanges
-+2. fill logs in batches
-3. main loop
-4. watch new exchanges
-5. watch new blocks
-'''
+def main():
+    asyncio.run(start())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
