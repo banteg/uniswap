@@ -1,6 +1,6 @@
 create table tokens (
   id bigserial primary key,
-  address bytea,
+  token text unique,
   symbol text,
   name text,
   decimals int
