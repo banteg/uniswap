@@ -60,7 +60,7 @@ class Token:
         except (OverflowError, BadFunctionCallOutput, ValueError):
             self.token = w3.eth.contract(address, abi=abi.token_bytes)
             try:    
-                self.symbol = self.token.functions.symbol().call().rstrip(b'\x00').decode()
+                self.symbol = self.token.functions.symbol().call().replace(b'\x00', b'').decode()
             except (OverflowError, BadFunctionCallOutput, ValueError):
                 self.symbol = None
 
