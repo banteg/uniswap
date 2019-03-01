@@ -13,6 +13,11 @@ class Exchange:
     def from_log(cls, log):
         return cls(token=log.args.token, exchange=log.args.exchange, block=log.blockNumber)
 
+    async def save(self):
+        await db.execute(
+            'insert into exchanges (token, exchange, block) values ($1, $2, $3)',
+            *astuple(self)
+        )
 
 
 @dataclass

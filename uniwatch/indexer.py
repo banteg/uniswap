@@ -34,11 +34,16 @@ def filter_params(address, from_block=None, to_block=None):
     }
 
 
-def get_exchanges() -> [Exchange]:
-    return [
+async def get_exchanges() -> [Exchange]:
+    last = await db.fetchval('select max(block) + 1 from exchanges') or uniswap.genesis
+    new_exchanges = [
         Exchange.from_log(log) for log in
         uniswap.events.NewExchange.createFilter(fromBlock=uniswap.genesis).get_all_entries()
     ]
+    for exchange in new_exchanges:
+        await exchange.save()
+    exchanges = await db.fetch('select token, exchange, block from exchanges')
+    return [Exchange(*row) for row in exchanges]
 
 
 async def index_exchange_logs(exchange: Exchange, step=4096):
@@ -58,7 +63,8 @@ async def index_exchange_logs(exchange: Exchange, step=4096):
 
 async def main():
     await db.init()
-    for i, e in enumerate(get_exchanges(), 1):
+    exchanges = await get_exchanges()
+    for i, e in enumerate(exchanges, 1):
         print(i, e)
         await index_exchange_logs(e)
 
