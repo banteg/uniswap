@@ -38,7 +38,7 @@ async def get_exchanges() -> [Exchange]:
     last = await db.fetchval('select max(block) + 1 from exchanges') or uniswap.genesis
     new_exchanges = [
         Exchange.from_log(log) for log in
-        uniswap.events.NewExchange.createFilter(fromBlock=uniswap.genesis).get_all_entries()
+        uniswap.events.NewExchange.createFilter(fromBlock=last).get_all_entries()
     ]
     for exchange in new_exchanges:
         await exchange.save()
@@ -49,16 +49,18 @@ async def get_exchanges() -> [Exchange]:
 async def index_exchange_logs(exchange: Exchange, step=4096):
     market = uniswap.get_exchange(exchange.token)
     print(market)
-    sql = 'select max(block) + 1 from events where exchange = $1'
+    sql = 'select last_block + 1 from exchanges where exchange = $1'
     start = await db.fetchval(sql, exchange.exchange) or exchange.block
     last = w3.eth.blockNumber
     for offset in trange(start, last, step):
-        params = filter_params(exchange.exchange, from_block=offset, to_block=min(offset + step - 1, last))
+        to_block = min(offset + step - 1, last)
+        params = filter_params(exchange.exchange, from_block=offset, to_block=to_block)
         batch = w3.eth.getLogs(params)
         decoded = decode_logs(batch)
         events = [Event.from_log(log) for log in decoded]
         for event in events:
             await event.save()
+        await exchange.update_last_block(to_block)
 
 
 async def main():

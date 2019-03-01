@@ -19,6 +19,9 @@ class Exchange:
             *astuple(self)
         )
 
+    async def update_last_block(self, block):
+        await db.execute('update exchanges set last_block = $2 where exchange = $1', self.exchange, block)
+
 
 @dataclass
 class Event:
