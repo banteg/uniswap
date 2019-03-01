@@ -42,15 +42,11 @@ async def get_exchanges() -> [Exchange]:
     ]
     for exchange in new_exchanges:
         await exchange.save()
+        market = uniswap.get_exchange(exchange.token)
+        token = Token(exchange.token, market.token.symbol, market.token.name, market.token.decimals)
+        await token.save()
     exchanges = await db.fetch('select token, exchange, block from exchanges')
     return [Exchange(*row) for row in exchanges]
-
-
-async def index_tokens(exchanges):
-    for exchange in exchanges:
-        ex = uniswap.get_exchange(exchange.token)
-        token = Token(token=exchange.token, symbol=ex.token.symbol, name=ex.token.name, decimals=ex.token.decimals)
-        await token.save()
 
 
 async def index_exchange_logs(exchange: Exchange, step=4096):
@@ -73,7 +69,6 @@ async def index_exchange_logs(exchange: Exchange, step=4096):
 async def main():
     await db.init()
     exchanges = await get_exchanges()
-    await index_tokens(exchanges)
     for i, e in enumerate(exchanges, 1):
         print(i, e)
         await index_exchange_logs(e)
