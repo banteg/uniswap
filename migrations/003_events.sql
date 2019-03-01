@@ -1,6 +1,6 @@
 create table events (
   id bigserial primary key,
-  exchange text,
+  exchange text references exchanges(exchange),
   event text,
   data json,
   block bigint,

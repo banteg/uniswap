@@ -42,16 +42,16 @@ async def get_exchanges() -> [Exchange]:
     ]
     for exchange in new_exchanges:
         await exchange.save()
+        print(f'new exchange: {exchange}')
         market = uniswap.get_exchange(exchange.token)
-        token = Token(exchange.token, market.token.symbol, market.token.name, market.token.decimals)
+        token = Token(token=exchange.token, symbol=market.token.symbol, decimals=market.token.decimals)
         await token.save()
+        print(f'new token: {token}')
     exchanges = await db.fetch('select token, exchange, block from exchanges')
     return [Exchange(*row) for row in exchanges]
 
 
 async def index_exchange_logs(exchange: Exchange, step=4096):
-    market = uniswap.get_exchange(exchange.token)
-    print(market)
     sql = 'select last_block + 1 from exchanges where exchange = $1'
     start = await db.fetchval(sql, exchange.exchange) or exchange.block
     last = w3.eth.blockNumber

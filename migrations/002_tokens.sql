@@ -1,7 +1,6 @@
 create table tokens (
   id bigserial primary key,
-  token text unique,
+  token text references exchanges(token),
   symbol text,
-  name text,
   decimals int
 );

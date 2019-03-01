@@ -46,11 +46,10 @@ class Event:
 class Token:
     token: str
     symbol: str
-    name: str
     decimals: int
 
     async def save(self):
         await db.execute(
-            'insert into tokens (token, symbol, name, decimals) values ($1, $2, $3, $4)',
+            'insert into tokens (token, symbol, decimals) values ($1, $2, $3)',
             *astuple(self)
         )
