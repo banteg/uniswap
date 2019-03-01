@@ -1,4 +1,5 @@
 import asyncio
+from itertools import count
 
 from uniwatch.db import db
 from uniwatch.models import Exchange, Event, Token
@@ -33,6 +34,15 @@ def filter_params(address, from_block=None, to_block=None):
     }
 
 
+async def fetch_events(addresses, from_block, to_block):
+    params = filter_params(addresses, from_block, to_block)
+    batch = w3.eth.getLogs(params)
+    decoded = decode_logs(batch)
+    events = [Event.from_log(log) for log in decoded]
+    for event in events:
+        await event.save()
+
+
 async def get_exchanges() -> [Exchange]:
     last = await db.fetchval('select max(block) + 1 from exchanges') or uniswap.genesis
     new_exchanges = [
@@ -51,23 +61,30 @@ async def get_exchanges() -> [Exchange]:
 
 
 async def index_parallel(exchanges: [Exchange], step=4096):
-    addresses = {x.exchange for x in exchanges}
+    addresses = [x.exchange for x in exchanges]
     start = await db.fetchval('select max(block) + 1 from events') or uniswap.genesis
     last = w3.eth.blockNumber
-    for offset in trange(start, last, step):
-        to_block = min(offset + step - 1, last)
-        params = filter_params(addresses, from_block=offset, to_block=to_block)
-        batch = w3.eth.getLogs(params)
-        decoded = decode_logs(batch)
-        events = [Event.from_log(log) for log in decoded]
-        for event in events:
-            await event.save()
+    for from_block in trange(start, last, step):
+        to_block = min(from_block + step - 1, last)
+        await fetch_events(addresses, from_block, to_block)
+    return last
+
+
+async def index_tail(start):
+    for block in count(start):
+        while block > w3.eth.blockNumber:
+            await asyncio.sleep(1)
+        print(block)  # TODO check for reorgs
+        exchanges = await get_exchanges()  # ineffective
+        addresses = [x.exchange for x in exchanges]
+        await fetch_events(addresses, from_block=block, to_block=block)
 
 
 async def start():
     await db.init()
     exchanges = await get_exchanges()
-    await index_parallel(exchanges)
+    last = await index_parallel(exchanges)
+    await index_tail(last + 1)
 
 
 def main():
