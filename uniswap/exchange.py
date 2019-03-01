@@ -54,14 +54,21 @@ class Exchange:
 class Token:
 
     def __init__(self, address):
+        self.token = w3.eth.contract(address, abi=abi.token)
         try:
-            self.token = w3.eth.contract(address, abi=abi.token)
             self.symbol = self.token.functions.symbol().call()
         except (OverflowError, BadFunctionCallOutput, ValueError):
             self.token = w3.eth.contract(address, abi=abi.token_bytes)
-            self.symbol = self.token.functions.symbol().call().rstrip(b'\x00').decode()
-        self.decimals = self.functions.decimals().call()
-    
+            try:    
+                self.symbol = self.token.functions.symbol().call().rstrip(b'\x00').decode()
+            except (OverflowError, BadFunctionCallOutput, ValueError):
+                self.symbol = None
+
+        try:
+            self.decimals = self.functions.decimals().call()
+        except (OverflowError, BadFunctionCallOutput, ValueError):
+            self.decimals = 0
+
     def __getattr__(self, name):
         return getattr(self.token, name)
 
