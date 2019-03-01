@@ -40,3 +40,17 @@ class Event:
             'insert into events (exchange, event, data, block, log_index) values ($1, $2, $3, $4, $5)',
             *astuple(self)
         )
+
+
+@dataclass
+class Token:
+    token: str
+    symbol: str
+    name: str
+    decimals: int
+
+    async def save(self):
+        await db.execute(
+            'insert into tokens (token, symbol, name, decimals) values ($1, $2, $3, $4)',
+            *astuple(self)
+        )

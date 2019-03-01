@@ -1,7 +1,7 @@
 import asyncio
 
 from uniwatch.db import db
-from uniwatch.models import Exchange, Event
+from uniwatch.models import Exchange, Event, Token
 from uniwatch.config import config
 from uniwatch import debug
 
@@ -46,6 +46,13 @@ async def get_exchanges() -> [Exchange]:
     return [Exchange(*row) for row in exchanges]
 
 
+async def index_tokens(exchanges):
+    for exchange in exchanges:
+        ex = uniswap.get_exchange(exchange.token)
+        token = Token(token=exchange.token, symbol=ex.token.symbol, name=ex.token.name, decimals=ex.token.decimals)
+        await token.save()
+
+
 async def index_exchange_logs(exchange: Exchange, step=4096):
     market = uniswap.get_exchange(exchange.token)
     print(market)
@@ -66,6 +73,7 @@ async def index_exchange_logs(exchange: Exchange, step=4096):
 async def main():
     await db.init()
     exchanges = await get_exchanges()
+    await index_tokens(exchanges)
     for i, e in enumerate(exchanges, 1):
         print(i, e)
         await index_exchange_logs(e)

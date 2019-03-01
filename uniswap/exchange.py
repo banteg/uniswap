@@ -57,12 +57,15 @@ class Token:
         self.token = w3.eth.contract(address, abi=abi.token)
         try:
             self.symbol = self.token.functions.symbol().call()
+            self.name = self.token.functions.name().call()
         except (OverflowError, BadFunctionCallOutput, ValueError):
             self.token = w3.eth.contract(address, abi=abi.token_bytes)
             try:    
                 self.symbol = self.token.functions.symbol().call().rstrip(b'\x00').decode()
+                self.name = self.token.functions.name().call().rstrip(b'\x00').decode()
             except (OverflowError, BadFunctionCallOutput, ValueError):
                 self.symbol = None
+                self.name = None
 
         try:
             self.decimals = self.functions.decimals().call()
