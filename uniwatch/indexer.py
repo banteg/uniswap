@@ -3,7 +3,6 @@ import asyncio
 from uniwatch.db import db
 from uniwatch.models import Exchange, Event, Token
 from uniwatch.config import config
-from uniwatch import debug
 
 from uniswap.factory import uniswap
 from uniswap import abi
