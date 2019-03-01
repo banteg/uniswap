@@ -1,4 +1,6 @@
+import json
 from pathlib import Path
+from functools import partial
 
 import asyncpg
 
@@ -12,7 +14,7 @@ class DB:
 
     async def init(self, dsn=None):
         dsn = dsn if dsn else config.postgres
-        self.pool = await asyncpg.create_pool(dsn)
+        self.pool = await asyncpg.create_pool(dsn, init=self.codecs)
         await self.migrate()
 
     def __getattr__(self, item):
@@ -27,6 +29,16 @@ class DB:
             print(f'migrate: {f.name}')
             await db.execute(f.read_text())
             await db.execute('insert into migrations (version, ts) values ($1, now())', f.name)
+
+    @staticmethod
+    async def codecs(conn: asyncpg.Connection):
+        await conn.set_type_codec(
+            'json',
+            encoder=partial(json.dumps, ensure_ascii=False),
+            decoder=json.loads,
+            schema='pg_catalog',
+            format='text'
+        )
 
 
 db = DB()
