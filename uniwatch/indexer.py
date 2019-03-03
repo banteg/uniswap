@@ -87,7 +87,7 @@ async def index_tail(start):
         while block > w3.eth.blockNumber:
             await asyncio.sleep(1)
         print(block)  # TODO check for reorgs
-        await fetch_new_exchanges()
+        await fetch_new_exchanges(block)
         exchanges = await get_exchanges()  # ineffective
         addresses = [x.exchange for x in exchanges]
         await fetch_events(addresses, from_block=block, to_block=block)
