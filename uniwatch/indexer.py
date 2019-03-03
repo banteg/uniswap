@@ -1,8 +1,9 @@
 import asyncio
 from itertools import count
+from datetime import datetime, timezone
 
 from uniwatch.db import db
-from uniwatch.models import Exchange, Event, Token
+from uniwatch.models import Exchange, Event
 from uniwatch.config import config
 
 from uniswap.factory import uniswap
@@ -39,25 +40,36 @@ async def fetch_events(addresses, from_block, to_block):
     batch = w3.eth.getLogs(params)
     decoded = decode_logs(batch)
     events = [Event.from_log(log) for log in decoded]
+    timestamps = {n: get_timestamp(n) for n in {x.block for x in events}}
     for event in events:
+        event.ts = timestamps[event.block]
         await event.save()
+    if events:
+        print(f'+{len(events)} events')
 
 
-async def get_exchanges() -> [Exchange]:
-    last = await db.fetchval('select max(block) + 1 from exchanges') or uniswap.genesis
+async def fetch_new_exchanges(from_block=None) -> [Exchange]:
+    last = from_block or await db.fetchval('select max(block) + 1 from exchanges') or uniswap.genesis
     new_exchanges = [
         Exchange.from_log(log) for log in
         uniswap.events.NewExchange.createFilter(fromBlock=last).get_all_entries()
     ]
     for exchange in new_exchanges:
-        await exchange.save()
-        print(f'new exchange: {exchange}')
         market = uniswap.get_exchange(exchange.token)
-        token = Token(token=exchange.token, symbol=market.token.symbol, decimals=market.token.decimals)
-        await token.save()
-        print(f'new token: {token}')
-    exchanges = await db.fetch('select token, exchange, block from exchanges')
+        exchange.symbol = market.token.symbol
+        exchange.decimals = market.token.decimals
+        await exchange.save()
+        print(exchange)
+
+
+async def get_exchanges() -> [Exchange]:
+    exchanges = await db.fetch('select token, exchange, block, symbol, decimals from exchanges')
     return [Exchange(*row) for row in exchanges]
+
+
+def get_timestamp(n):
+    # TODO: make this async
+    return datetime.fromtimestamp(w3.eth.getBlock(n).timestamp, tz=timezone.utc)
 
 
 async def index_parallel(exchanges: [Exchange], step=4096):
@@ -75,6 +87,7 @@ async def index_tail(start):
         while block > w3.eth.blockNumber:
             await asyncio.sleep(1)
         print(block)  # TODO check for reorgs
+        await fetch_new_exchanges()
         exchanges = await get_exchanges()  # ineffective
         addresses = [x.exchange for x in exchanges]
         await fetch_events(addresses, from_block=block, to_block=block)
@@ -82,6 +95,7 @@ async def index_tail(start):
 
 async def start():
     await db.init()
+    await fetch_new_exchanges()
     exchanges = await get_exchanges()
     last = await index_parallel(exchanges)
     await index_tail(last + 1)

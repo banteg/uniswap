@@ -5,5 +5,6 @@ create table events (
   data json,
   block bigint,
   log_index int,
+  ts timestamptz,
   constraint unq_block_log_index unique(block, log_index)
 );

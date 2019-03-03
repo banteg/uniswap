@@ -1,3 +1,4 @@
+from datetime import datetime
 from dataclasses import dataclass, astuple
 
 from uniwatch.db import db
@@ -8,6 +9,8 @@ class Exchange:
     token: str
     exchange: str
     block: int
+    symbol: str = None
+    decimals: str = None
 
     @classmethod
     def from_log(cls, log):
@@ -15,12 +18,9 @@ class Exchange:
 
     async def save(self):
         await db.execute(
-            'insert into exchanges (token, exchange, block) values ($1, $2, $3)',
+            'insert into exchanges (token, exchange, block, symbol, decimals) values ($1, $2, $3, $4, $5)',
             *astuple(self)
         )
-
-    async def update_last_block(self, block):
-        await db.execute('update exchanges set last_block = $2 where exchange = $1', self.exchange, block)
 
 
 @dataclass
@@ -30,6 +30,7 @@ class Event:
     data: dict
     block: int
     log_index: int
+    ts: datetime = None
 
     @classmethod
     def from_log(cls, log):
@@ -37,19 +38,6 @@ class Event:
 
     async def save(self):
         await db.execute(
-            'insert into events (exchange, event, data, block, log_index) values ($1, $2, $3, $4, $5)',
-            *astuple(self)
-        )
-
-
-@dataclass
-class Token:
-    token: str
-    symbol: str
-    decimals: int
-
-    async def save(self):
-        await db.execute(
-            'insert into tokens (token, symbol, decimals) values ($1, $2, $3)',
+            'insert into events (exchange, event, data, block, log_index, ts) values ($1, $2, $3, $4, $5, $6)',
             *astuple(self)
         )
