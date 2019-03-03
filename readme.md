@@ -1,6 +1,4 @@
-# uniwatch
-
-uniswap analytics
+# uniswap analytics
 
 ## installation
 
@@ -8,9 +6,9 @@ uniswap analytics
 
 - run `createdb uniswap` to create a database
 
-- create `config.toml` and specify postgress dsn:
+- create `config.toml` and specify postgres connection parameters:
 
-```
+```toml
 postgres = "postgresql://postgres@127.0.0.1:5432/uniswap"
 ```
 
@@ -18,8 +16,8 @@ postgres = "postgresql://postgres@127.0.0.1:5432/uniswap"
 
 ## usage
 
-the only currently working part is the indexer.
-it fetches all exchanges, tokens and events (decoded) in parallel up to the current block and stores them to postgres.
+indexer is the only part that works currently.
+it fetches all exchanges, tokens and events (decoded) in parallel up to the current block and beyond (think `tail -f`) and stores them to the database.
 the full process takes about 10 minutes.
 
 - `poetry run index`
