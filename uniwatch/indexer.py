@@ -1,6 +1,8 @@
 import asyncio
 from itertools import count
 from datetime import datetime, timezone
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 
 from uniwatch.db import db
 from uniwatch.models import Exchange, Event
@@ -9,12 +11,13 @@ from uniwatch.config import config
 from uniswap.factory import uniswap
 from uniswap import abi
 
-from tqdm import trange
 from web3.auto import w3
 from web3.utils.events import get_event_data
 from eth_utils import event_abi_to_log_topic, encode_hex
 
 
+loop = asyncio.get_event_loop()
+pool = ThreadPoolExecutor(10)
 topics_to_abi = {event_abi_to_log_topic(x): x for x in abi.exchange if x['type'] == 'event'}
 topic_filter = [encode_hex(x) for x in topics_to_abi]
 
@@ -40,12 +43,14 @@ async def fetch_events(addresses, from_block, to_block):
     batch = w3.eth.getLogs(params)
     decoded = decode_logs(batch)
     events = [Event.from_log(log) for log in decoded]
-    timestamps = {n: get_timestamp(n) for n in {x.block for x in events}}
+    blocks = list({x.block for x in events})
+    futures = [get_timestamp(n) for n in blocks]
+    results = await asyncio.gather(*futures)
+    timestamps = {n: result for n, result in zip(blocks, results)}
     for event in events:
         event.ts = timestamps[event.block]
         await event.save()
-    if events:
-        print(f'+{len(events)} events')
+    return events
 
 
 async def fetch_new_exchanges(from_block=None) -> [Exchange]:
@@ -67,18 +72,22 @@ async def get_exchanges() -> [Exchange]:
     return [Exchange(*row) for row in exchanges]
 
 
-def get_timestamp(n):
-    # TODO: make this async
-    return datetime.fromtimestamp(w3.eth.getBlock(n).timestamp, tz=timezone.utc)
+async def get_timestamp(n):
+    block = await loop.run_in_executor(pool, w3.eth.getBlock, n)
+    return datetime.fromtimestamp(block.timestamp, tz=timezone.utc)
 
 
 async def index_parallel(exchanges: [Exchange], step=4096):
     addresses = [x.exchange for x in exchanges]
     start = await db.fetchval('select max(block) + 1 from events') or uniswap.genesis
     last = w3.eth.blockNumber
-    for from_block in trange(start, last, step):
+    for from_block in range(start, last, step):
+        t0 = datetime.now()
         to_block = min(from_block + step - 1, last)
-        await fetch_events(addresses, from_block, to_block)
+        events = await fetch_events(addresses, from_block, to_block)
+        counts = Counter(x.event for x in events)
+        counts = ", ".join(f'{c} x {e}' for e, c in counts.most_common())
+        print(f'{from_block:,d}-{to_block:,d} ({last-from_block:,d} left): {counts}, took {datetime.now() - t0}')
     return last
 
 
@@ -102,7 +111,7 @@ async def start():
 
 
 def main():
-    asyncio.run(start())
+    loop.run_until_complete(start())
 
 
 if __name__ == "__main__":
