@@ -2,14 +2,17 @@
 
 ## installation
 
-- install python 3.7, poetry, postgres and a local ethereum node
+- install python 3.7, poetry, postgres and a local ethereum node (optional)
 
 - run `createdb uniswap` to create a database
 
-- create `config.toml` and specify postgres connection parameters:
+- create `config.toml` and specify connection parameters:
 
 ```toml
 postgres = "postgresql://postgres@127.0.0.1:5432/uniswap"
+# by default it connects to a local node at http://127.0.0.1:8545
+# if you want to use infura, specify it here
+ethereum = "https://mainnet.infura.io/metamask"
 ```
 
 - run `poetry install` to install all dependencies.

@@ -3,12 +3,12 @@ from operator import itemgetter
 from dataclasses import dataclass
 from decimal import Decimal
 
-from web3.auto import w3
 from web3.contract import ConciseContract
 from web3.exceptions import BadFunctionCallOutput
 
 from uniswap.utils import from_wei
 from uniswap import abi
+from uniwatch.eth import w3
 
 
 class Exchange:

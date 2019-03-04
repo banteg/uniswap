@@ -2,11 +2,11 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 
-from web3.auto import w3
 from web3.contract import ConciseContract
 
 from uniswap.exchange import Exchange
 from uniswap import abi
+from uniwatch.eth import w3
 
 
 class Uniswap:

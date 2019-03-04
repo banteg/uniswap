@@ -7,11 +7,11 @@ from concurrent.futures import ThreadPoolExecutor
 from uniwatch.db import db
 from uniwatch.models import Exchange, Event
 from uniwatch.config import config
+from uniwatch.eth import w3
 
 from uniswap.factory import uniswap
 from uniswap import abi
 
-from web3.auto import w3
 from web3.utils.events import get_event_data
 from eth_utils import event_abi_to_log_topic, encode_hex
 
@@ -29,17 +29,17 @@ def decode_logs(logs):
     ]
 
 
-def filter_params(address, from_block=None, to_block=None):
+def filter_params(address, from_block=None, to_block=None, topics=None):
     return {
         'address': address,  # many addresses possible
-        'fromBlock': from_block or config.genesis,
+        'fromBlock': from_block or uniswap.genesis,
         'toBlock': to_block or 'latest',
-        'topics': [topic_filter]
+        'topics': topics or [],
     }
 
 
 async def fetch_events(addresses, from_block, to_block):
-    params = filter_params(addresses, from_block, to_block)
+    params = filter_params(addresses, from_block, to_block, [topic_filter])
     batch = w3.eth.getLogs(params)
     decoded = decode_logs(batch)
     events = [Event.from_log(log) for log in decoded]
@@ -54,11 +54,14 @@ async def fetch_events(addresses, from_block, to_block):
 
 
 async def fetch_new_exchanges(from_block=None) -> [Exchange]:
-    last = from_block or await db.fetchval('select max(block) + 1 from exchanges') or uniswap.genesis
-    new_exchanges = [
-        Exchange.from_log(log) for log in
-        uniswap.events.NewExchange.createFilter(fromBlock=last).get_all_entries()
-    ]
+    last_indexed = await db.fetchval('select max(block) + 1 from exchanges')
+    last = from_block or last_indexed or uniswap.genesis
+    event = uniswap.events.NewExchange()
+    topics = [encode_hex(event_abi_to_log_topic(event._get_event_abi()))]
+    params = filter_params(uniswap.address, last, 'latest', topics)
+    logs = w3.eth.getLogs(params)
+    decoded = event.processReceipt({'logs': logs})
+    new_exchanges = [Exchange.from_log(log) for log in decoded]
     for exchange in new_exchanges:
         market = uniswap.get_exchange(exchange.token)
         exchange.symbol = market.token.symbol
@@ -77,7 +80,7 @@ async def get_timestamp(n):
     return datetime.fromtimestamp(block.timestamp, tz=timezone.utc)
 
 
-async def index_parallel(exchanges: [Exchange], step=4096):
+async def index_parallel(exchanges: [Exchange], step=1024):
     addresses = [x.exchange for x in exchanges]
     start = await db.fetchval('select max(block) + 1 from events') or uniswap.genesis
     last = w3.eth.blockNumber
@@ -86,8 +89,8 @@ async def index_parallel(exchanges: [Exchange], step=4096):
         to_block = min(from_block + step - 1, last)
         events = await fetch_events(addresses, from_block, to_block)
         counts = Counter(x.event for x in events)
-        counts = ", ".join(f'{c} x {e}' for e, c in counts.most_common())
-        print(f'{from_block:,d}-{to_block:,d} ({last-from_block:,d} left): {counts}, took {datetime.now() - t0}')
+        counts_pretty = ", ".join(f'{c} x {e}' for e, c in counts.most_common()) if counts else '(no events)'
+        print(f'{from_block:,d}-{to_block:,d} ({last-from_block:,d} left): {counts_pretty}, took {datetime.now() - t0}')
     return last
 
 
